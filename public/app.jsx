@@ -1394,7 +1394,7 @@ class Game extends React.Component {
                                             <button onClick={() => this.setUserAction("museum")}>Исп.
                                                 Музей</button> : null}
                                         {(this.hasDistricts('laboratory') && data.player.hand.length && data.laboratoryAction)
-                                        && !(!magistrateOpenAction && !seerReturnAction) ?
+                                        && (!magistrateOpenAction && !seerReturnAction) ?
                                             <button onClick={() => this.setUserAction("laboratory")}>Исп.
                                                 Лабораторию</button> : null}
                                         {this.hasDistricts('arsenal')
