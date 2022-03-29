@@ -134,6 +134,7 @@ function init(wsServer, path) {
                         room.winnerPlayer = null;
                         room.tax = 0;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
+                        state.wizardPlayer = null
                         newRound();
                     }
                 },
