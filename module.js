@@ -691,14 +691,18 @@ function init(wsServer, path) {
                             room.playerGold[slot] += 2;
                             if (include(slot, "gold_mine"))
                                 room.playerGold[slot] += 1;
-                            if (waitToResponse()) return moveToResponse();
+                            if (waitToResponse()) {
+                                countPoints(slot);
+                                return moveToResponse();
+                            }
                         } else {
                             if (!state.districtDeck.length) return;
                             room.tookResource = true;
                             const cardsToTake = state.districtDeck.splice(0, 2 + include(slot, "observatory"));
-                            if (include(slot, "library")) {
-                                state.players[slot].hand.push(...cardsToTake);
-                                room.playerHand[slot] += cardsToTake.length;
+                            if (waitToResponse()) {
+                                countPoints(slot);
+                                sendStateSlot(slot);
+                                return moveToResponse();
                             } else {
                                 state.players[slot].choose = cardsToTake;
                                 room.phase = 3;
