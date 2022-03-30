@@ -699,10 +699,14 @@ function init(wsServer, path) {
                             if (!state.districtDeck.length) return;
                             room.tookResource = true;
                             const cardsToTake = state.districtDeck.splice(0, 2 + include(slot, "observatory"));
-                            if (waitToResponse()) {
-                                countPoints(slot);
-                                sendStateSlot(slot);
-                                return moveToResponse();
+                            if (include(slot, "library")) {
+                                state.players[slot].hand.push(...cardsToTake);
+                                room.playerHand[slot] += cardsToTake.length;
+                                if (waitToResponse()) {
+                                    countPoints(slot);
+                                    sendStateSlot(slot);
+                                    return moveToResponse();
+                                }
                             } else {
                                 state.players[slot].choose = cardsToTake;
                                 room.phase = 3;
