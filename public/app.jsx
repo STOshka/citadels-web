@@ -824,15 +824,14 @@ class Game extends React.Component {
             this.socket.emit("seer-return", cardInd);
         } else {
             const cardType = this.state.player.hand[cardInd].type;
-            if (!forGold && cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && this.state.buildDistricts > 0)
+            if (!forGold && cardType === "necropolis" && this.state.playerDistricts[this.state.userSlot].length && (this.state.buildDistricts > 0 || this.state.player.hand[cardInd].wizard))
                 this.setUserAction("necropolis");
-            else if (!forGold && cardType === "den_of_thieves" && this.state.player.hand.length > 1 && this.state.buildDistricts > 0)
+            else if (!forGold && cardType === "den_of_thieves" && this.state.player.hand.length > 1 && (this.state.buildDistricts > 0 || this.state.player.hand[cardInd].wizard))
                 this.setUserAction("den_of_thieves");
             else if (this.state.currentCharacter === "5_3" && this.state.buildDistricts && Object.keys(this.state.playerCharacter).some((player) => this.isCardinalActionAvailable(cardInd, player)))
                 this.setUserAction("cardinal-action-player", {buildTarget: cardInd});
             else
                 this.socket.emit('build', cardInd);
-
         }
     }
 
