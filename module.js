@@ -595,14 +595,16 @@ function init(wsServer, path) {
                 },
                 destroy = (slot_d, cardInd) => {
                     const building = room.playerDistricts[slot_d][cardInd];
-                    if (building.exposition) {
-                        state.districtDeck.push(...building.exposition);
-                        delete building.exposition;
+                    if (building) {
+                        if (building.exposition) {
+                            state.districtDeck.push(...building.exposition);
+                            delete building.exposition;
+                        }
+                        if (building.decoration) {
+                            delete building.decoration;
+                        }
+                        dropCardDistricts(slot_d, cardInd);
                     }
-                    if (building.decoration) {
-                        delete building.decoration;
-                    }
-                    dropCardDistricts(slot_d, cardInd);
                 },
                 dropCardHand = (slot, cardInd) => state.districtDeck.push(...state.players[slot].hand.splice(cardInd, 1)),
                 dropCardDistricts = (slot, cardInd) => state.districtDeck.push(...room.playerDistricts[slot].splice(cardInd, 1)),
