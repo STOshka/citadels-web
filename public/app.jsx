@@ -28,7 +28,7 @@ class Player extends React.Component {
                  onTouchStart={(e) => e.target.focus()}
                  data-playerId={id}>
                 {hasPlayer
-                    ? data.playerNames[id]
+                    ? (<PlayerName data={data} id={id} />)
                     : (data.teamsLocked
                         ? (<div className="slot-empty">Empty</div>)
                         : (<div className="join-slot-button"
@@ -683,29 +683,13 @@ class Game extends React.Component {
 
     componentDidMount() {
         this.gameName = "citadels";
-        const initArgs = {};
-        if (!localStorage.citadelsUserId || !localStorage.citadelsUserToken) {
-            while (!localStorage.userName)
-                localStorage.userName = prompt("Your name");
-            localStorage.citadelsUserId = makeId();
-            localStorage.citadelsUserToken = makeId();
-        }
-        if (!location.hash)
-            history.replaceState(undefined, undefined, location.origin + location.pathname + "#" + makeId());
-        else
-            history.replaceState(undefined, undefined, location.origin + location.pathname + location.hash);
-        initArgs.roomId = location.hash.substr(1);
-        initArgs.userId = this.userId = localStorage.citadelsUserId;
-        initArgs.token = this.userToken = localStorage.citadelsUserToken;
-        initArgs.wssToken = window.wssToken;
-        initArgs.userName = localStorage.userName;
-        this.socket = window.socket.of("citadels");
+        const initArgs = CommonRoom.roomInit(this);
         this.socket.on("state", (state) => {
             CommonRoom.processCommonRoom(state, this.state, {
                 maxPlayers: 8,
                 largeImageKey: "citadels",
                 details: "Citadels"
-            });
+            }, this);
             if (this.state && this.state.currentPlayer !== this.state.userSlot && state.currentPlayer === this.state.userSlot)
                 this.turnSound.play();
             this.setState(Object.assign({
@@ -1119,12 +1103,12 @@ class Game extends React.Component {
         if (this.state.testMode)
             this.socket.emit("remove-player", id);
         else
-            popup.confirm({content: `Removing ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("remove-player", id));
+            popup.confirm({content: `Removing ${window.commonRoom.getPlayerName(id)}?`}, (evt) => evt.proceed && this.socket.emit("remove-player", id));
     }
 
     handleGiveHost(id, evt) {
         evt.stopPropagation();
-        popup.confirm({content: `Give host ${this.state.playerNames[id]}?`}, (evt) => evt.proceed && this.socket.emit("give-host", id));
+        popup.confirm({content: `Give host ${window.commonRoom.getPlayerName(id)}?`}, (evt) => evt.proceed && this.socket.emit("give-host", id));
     }
 
     hasDistricts(building) {
@@ -1200,6 +1184,7 @@ class Game extends React.Component {
                         "isPlayer": data.playerSlots.includes(data.userId) && data.phase !== 0 && data.winnerPlayer == null
                     })}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
+                    <CommonRoom state={this.state} app={this}/>
                     {data.phase !== 0 ?
                         <div className={cs("character-section", `characters-count-${data.characterInGame.length}`)}>
                             <div className="cards-list">
@@ -1319,7 +1304,7 @@ class Game extends React.Component {
                                 {data.phase == 2 && data.player.action === "seer-return" ?
                                     <div className="status-text" className="choose-character">
                                         <p className="status-text" className="status-text">Выберите карту, чтобы отдать
-                                            её {data.playerNames[data.playerSlots[data.seerReturnSlot]]}</p>
+                                            её {window.commonRoom.getPlayerName(data.playerSlots[data.seerReturnSlot])}</p>
                                     </div>
                                     : null}
                                 {data.phase == 1.5 ?
@@ -1525,7 +1510,6 @@ class Game extends React.Component {
                         </div>
                         <i className="settings-hover-button material-icons">settings</i>
                     </div>
-                    <CommonRoom state={this.state} app={this}/>
                 </div>)
         } else return (<div/>);
 

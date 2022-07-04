@@ -16,8 +16,8 @@ function init(wsServer, path) {
     });
 
     class GameState extends wsServer.users.RoomState {
-        constructor(hostId, hostData, userRegistry) {
-            super(hostId, hostData, userRegistry);
+        constructor(hostId, hostData, userRegistry, registry) {
+            super(hostId, hostData, userRegistry, registry.games.citadels.id, path);
             const room = {
                 ...this.room,
                 inited: true,
@@ -449,6 +449,9 @@ function init(wsServer, path) {
                             if (room.playerScore[state.characterRoles[role]] >= maxPoints) {
                                 maxPoints = room.playerScore[state.characterRoles[role]];
                                 room.winnerPlayer = state.characterRoles[role];
+                                const userData = {user: room.playerSlots[room.winnerPlayer], room};
+                                registry.authUsers.processAchievement(userData, registry.achievements.win100Citadels.id);
+                                registry.authUsers.processAchievement(userData, registry.achievements.winGames.id, {game: registry.games.citadels.id});
                             }
                     }
                     room.phase = 0;
@@ -1413,11 +1416,6 @@ function init(wsServer, path) {
                     }
                     update();
                 },
-                "change-name": (user, value) => {
-                    if (value)
-                        room.playerNames[user] = value.substr && value.substr(0, 60);
-                    update();
-                }
             };
         }
 
@@ -1459,7 +1457,7 @@ function init(wsServer, path) {
         }
     }
 
-    registry.createRoomManager(path, channel, GameState);
+    registry.createRoomManager(path, GameState);
 }
 
 module.exports = init;
