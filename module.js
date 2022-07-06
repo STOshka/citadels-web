@@ -427,10 +427,10 @@ function init(wsServer, path) {
                         sendStateSlot(room.currentPlayer);
                         return;
                     }
-                    if (room.ender != null) return endGame();
+                    if (room.ender != null) return endGame(true);
                     newRound();
                 },
-                endGame = () => {
+                endGame = (finished) => {
                     room.currentPlayer = null;
                     room.targetSlot = null;
                     Object.keys(state.players).forEach(slot => {
@@ -449,9 +449,11 @@ function init(wsServer, path) {
                             if (room.playerScore[state.characterRoles[role]] >= maxPoints) {
                                 maxPoints = room.playerScore[state.characterRoles[role]];
                                 room.winnerPlayer = state.characterRoles[role];
-                                const userData = {user: room.playerSlots[room.winnerPlayer], room};
-                                registry.authUsers.processAchievement(userData, registry.achievements.win100Citadels.id);
-                                registry.authUsers.processAchievement(userData, registry.achievements.winGames.id, {game: registry.games.citadels.id});
+                                if (finished) {
+                                    const userData = {user: room.playerSlots[room.winnerPlayer], room};
+                                    registry.authUsers.processAchievement(userData, registry.achievements.win100Citadels.id);
+                                    registry.authUsers.processAchievement(userData, registry.achievements.winGames.id, {game: registry.games.citadels.id});
+                                }
                             }
                     }
                     room.phase = 0;
