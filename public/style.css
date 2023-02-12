@@ -115,6 +115,7 @@ h1, h2, h3 {
     color: white;
     width: 100%;
     flex-wrap: nowrap;
+    padding-top: 2px;
     white-space: nowrap;
 }
 
@@ -666,6 +667,7 @@ button {
     font-weight: 400;
     z-index: 1;
     box-shadow: 0 0 6px 1px black;
+    user-select: none;
 }
 
 .action-button {
@@ -728,7 +730,10 @@ button {
     filter: brightness(0.9) grayscale(1);
 }
 
-.status.blackmailed + .character {
+.status.blackmailed + .character,
+.status.magistrated + .character,
+.status.true-blackmailed + .character,
+.status.true-magistrated + .character {
     filter: brightness(0.9) grayscale(0.5);
 }
 
@@ -1353,4 +1358,160 @@ button.inactive {
 
 .player-slot.seer-return {
     box-shadow: 0 0 6px 3px #346bf0;
+}
+
+.player-slot.target {
+    box-shadow: 0 0 6px 3px #346bf0;
+}
+
+.chat:not(.active) .chat-messages {
+    background: #f1f1f180 !important;
+}
+
+.chat.active .chat-tab-buttons {
+    background: #ffffff7a;
+}
+
+.chat-messages {
+    background: #f1f1f1cf;
+}
+
+/* дополнительная вложенность, чтобы не пересекаться
+с уже существующими медиа запросами */
+@media (min-width: 750px) {
+    /* высота 842px это 774px блока с 9 ролями, 32px блока наблюдателей
+    и 36px блока с настройками игры. Срабатывание на такой высоте
+    вьюпорта позволяет сделать так, чтобы эти блоки друг на друга
+    не наслаивались */
+    @media (max-height: 842px) {
+        .character-section.characters-count-9 {
+            width: 9vh;
+        }
+        /* сдвигает блок с наблюдателями и с управлением игрой,
+        чтоб они не наслаивались на блок ролей */
+        .characters-count-9 ~ .spectators-section,
+        .characters-count-9 ~ .host-controls {
+            right: 9vh;
+        }
+        .character-section .status.robbed,
+        .character-section .status.blackmailed,
+        .character-section .status.true-blackmailed,
+        .character-section .status.magistrated,
+        .character-section .status.true-magistrated,
+        .character-section .status.witched,
+        .character-section .status.assassined {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            height: auto;
+        }
+        .status svg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 80%;
+            width: auto;
+            height: auto;
+        }
+
+        .status.two-icons .assassined-icon,
+        .status.two-icons .robbed-icon,
+        .status.two-icons .blackmailed-icon,
+        .status.two-icons .true-blackmailed-icon,
+        .status.two-icons .magistrated-icon,
+        .status.two-icons .true-magistrated-icon {
+            position: static;
+        }
+        .status .witched-icon svg,
+        .status .magistrated-icon svg,
+        .status .true-magistrated-icon svg {
+            width: 70%;
+            height: auto;
+            margin: 0;
+        }
+        .status.two-icons .robbed-icon svg,
+        .status.two-icons .blackmailed-icon svg,
+        .status.two-icons .true-blackmailed-icon svg {
+            width: 50%;
+            top: 30%;
+            left: 30%;
+        }
+        .status.two-icons .magistrated-icon svg,
+        .status.two-icons .true-magistrated-icon svg {
+            width: 50%;
+            top: 70%;
+            left: 70%;
+        }
+        /* дополнительное условие, чтобы не дублировать стили
+        при высоте вьюпорта менее 756px */
+        @media (min-height: 756px) {
+            .characters-count-9 .token-slot {
+                flex-grow: 1;
+                width: 100%;
+            }
+            .characters-count-9 .cards-list {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+            }
+            .characters-count-9 .cards-list .character {
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
+                width: auto;
+                height: auto;
+            }
+        }
+    }
+
+    /* высота 756px это 688px блока с 8 ролями, 32px блока наблюдателей
+    и 36px блока с настройками игры */
+    @media (max-height: 756px) { /* 688 + 68 */
+        .character-section.characters-count-8 {
+            width: 10.5vh;
+        }
+        /* сдвигает блок с наблюдателями и с управлением игрой,
+        чтоб они не наслаивались на блок ролей */
+        .characters-count-8 ~ .spectators-section,
+        .characters-count-8 ~ .host-controls {
+            right: 10.5vh;
+        }
+
+        /* при высоте вьюпорта менее 688px увеличенная карточка роли
+        видна не целиком. Эти стили уменьшают карточку так, чтобы она
+        сохраняла пропорции и занимала не более 95% высоты экрана */
+        .card-item-zoomed {
+            max-height: 95vh;
+        }
+        .card.card-item .card-item-zoomed {
+            width: 60vh;
+        }
+        .character .card-item-zoomed {
+            width: 54vh;
+        }
+
+
+        .character-section .token-slot {
+            flex-grow: 1;
+            width: 100%;
+        }
+        .character-section .cards-list {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+        }
+        .character-section .cards-list .character {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            width: auto;
+            height: auto;
+        }
+    }
 }
