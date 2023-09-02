@@ -27,6 +27,7 @@ function init(wsServer, path) {
                 onlinePlayers: new JSONSet(),
                 spectators: new JSONSet(),
                 teamsLocked: false,
+                arcaded: false,
                 phase: 0,
                 currentPlayer: null,
                 targetSlot: null,
@@ -36,7 +37,14 @@ function init(wsServer, path) {
                 playerHand: {},
                 playerDistricts: {},
                 playerCharacter: {},
-                playerScore: {}
+                playerScore: {},
+                timed: false,
+                timeChanged: false,
+                afkSlots: [],
+                pickTime: 90,
+                turnTime: 30,
+                leavedPickTime: 20,
+                leavedTurnTime: 5,
             };
             if (testMode)
                 [1, 2, 3, 4].forEach((_, ind) => {
@@ -66,6 +74,13 @@ function init(wsServer, path) {
                 },
                 updateState = () => [...room.onlinePlayers].forEach(sendState),
                 sendStateSlot = (slot) => sendState(room.playerSlots[slot]),
+                markAsAFK = (slot) => room.afkSlots[slot] = slot && sendStateSlot(slot) // логику добавления класса,
+                unMarkAsAFK = (slot) => room.afkSlots[slot] = null,
+                getRandomCharacterIdx = () => Math.floor(Math.random() * state.characterDeck.length),
+                pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](room.playerSlots[slot], getRandomCharacterIdx()),
+                endActionCharacter = (slot) => {
+                    // если такой перс, то сделай то и return и тд по всем
+                }
                 getRandomPlayer = () => {
                     const res = [];
                     room.playerSlots.forEach((user, slot) => {
@@ -95,6 +110,46 @@ function init(wsServer, path) {
                             slot--;
                     }
                     return slot;
+                },
+                startTimer = () => {
+                    if (room.timed) {
+                        if (room.phase === 1)
+                            room.time = room.timeTotal = room.pickTime * 1000;
+                        else
+                            room.time = room.timeTotal = room.turnTime * 1000;
+                        let time = new Date();
+                        clearInterval(timerInterval);
+                        timerInterval = setInterval(() => {
+                            if (!room.paused) {
+                                room.time -= new Date() - time;
+                                time = new Date();
+                                if (room.time <= 0) {
+                                    clearInterval(timerInterval);
+                                    const failed = room.currentPlayer;
+                                    if (room.phase === 1) {
+                                        pickRandomCharacter(room.currentPlayer);
+                                        markAsAFK(room.currentPlayer);
+                                    }
+                                    if (room.phase === 2 || room.phase === 1.5) {
+                                        endActionCharacter();
+                                        this.slotEventHandlers['end-turn'](room.currentPlayer);
+                                        // потестить не нужна ли "отмена действия" на кварталах
+                                        // pickRandomCharacter(room.currentPlayer);
+                                    }
+                                    if (failed != null) {
+                                        room.whiteBoard.push({
+                                            type: "timer-fail",
+                                            slotFailed: failed
+                                        });
+                                        room.partyWin = state.players[failed].role !== "c"
+                                            ? (state.players[failed].role === "l" ? "f" : "l")
+                                            : shuffleArray(["f", "l"])[0];
+                                    }
+                                    // endGame();
+                                }
+                            } else time = new Date();
+                        }, 100);
+                    }
                 },
                 startGame = (districts) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
@@ -457,6 +512,7 @@ function init(wsServer, path) {
                             }
                     }
                     room.phase = 0;
+                    room.paused = true;
 
                     room.presetSelected = null;
                     update();
@@ -1342,8 +1398,7 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (['witch-action',
-                            'magistrate-open',
+                        if (['magistrate-open',
                             'blackmailed-response',
                             'blackmailed-open',
                             'emperor-action',
@@ -1385,6 +1440,31 @@ function init(wsServer, path) {
                 "toggle-lock": (user) => {
                     if (user === room.hostId)
                         room.teamsLocked = !room.teamsLocked;
+                    update();
+                },
+                "toggle-timed": (user) => {
+                    if (user === room.hostId) {
+                        room.timed = !room.timed;
+                        if (!room.timed) {
+                            room.paused = true;
+                            clearInterval(timerInterval);
+                        } else {
+                            if (room.phase !== 0) {
+                                room.paused = false;
+                                startTimer();
+                            } else room.paused = true;
+                        }
+                    }
+                    update();
+                },
+                "toggle-paused": (user) => {
+                    if (user === room.hostId) {
+                        room.paused = !room.paused;
+                        if (!room.paused && room.timeChanged) {
+                            room.timeChanged = false;
+                            startTimer();
+                        }
+                    }
                     update();
                 },
                 "players-join": (user, slot) => {

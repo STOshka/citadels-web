@@ -168,6 +168,7 @@ class PlayerSlot extends React.Component {
                 "winner": isWinner,
                 "player-chosen": playerChosen,
                 "hasCrown": data.king === slot,
+                // "isAFK": data?.afkSlots[slot],
                 "seer-return": slot === data.seerReturnSlot,
                 "target": slot === data.targetSlot
             })}>
@@ -219,6 +220,10 @@ class PlayerSlot extends React.Component {
                             {data.king == slot ?
                                 <div className="profile-crown"></div>
                                 : null}
+                            <div className="profile-afk"></div>
+                            {/* {!data?.afkSlots[slot] === slot ?
+                                <div className="profile-afk"></div>
+                                : null} */}
                         </div>
                         : null}
 
@@ -1050,6 +1055,21 @@ class Game extends React.Component {
         this.socket.emit("toggle-lock");
     }
 
+    handleSwitchGameMode() {
+        this.socket.emit("toggle-change-mode");
+    }
+
+    handleToggleTimed() {
+        console.log('"toggle-timed');
+        // document.documentElement.classList.add("watch");
+        this.socket.emit("toggle-timed");
+    }
+
+    handleClickPause() {
+        console.log('toggle-paused');
+        this.socket.emit("toggle-paused");
+    }
+
     handleClickChangeName() {
         const name = prompt("New name");
         this.socket.emit("change-name", name);
@@ -1140,6 +1160,8 @@ class Game extends React.Component {
             necropolisAction = data.player && data.userAction === 'necropolis' && data.phase === 2,
             denOfThievesAction = data.player && data.userAction === 'den_of_thieves' && data.phase === 2;
 
+        console.log('DATA:', data);
+
         if (this.state.disconnected)
             return (<div
                 className="kicked">Disconnected{this.state.disconnectReason ? ` (${this.state.disconnectReason})` : ""}</div>);
@@ -1185,6 +1207,10 @@ class Game extends React.Component {
                     })}
                     onMouseUp={(evt) => this.handleBodyRelease(evt)}>
                     <CommonRoom state={this.state} app={this}/>
+                    {data.timed ? (<div className="watch">
+                                <div className="watch-hand" id="watch-hand"/>
+                                <div id="watch-face"/>
+                            </div>) : ""}
                     {data.phase !== 0 ?
                         <div className={cs("character-section", `characters-count-${data.characterInGame.length}`)}>
                             <div className="cards-list">
@@ -1496,11 +1522,25 @@ class Game extends React.Component {
                                       className="material-icons start-game settings-button">lock_outline</i>)
                                 : (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_open</i>)) : ""}
+                            {isHost ? (!data.timed
+                                ? (<i onClick={() => this.handleToggleTimed()}
+                                    className="material-icons start-game settings-button">alarm_off</i>)
+                                : (<i onClick={() => this.handleToggleTimed()}
+                                    className="material-icons start-game settings-button">alarm</i>)) : ""}
+                            {isHost ? (!data.arcaded
+                                ? (<i onClick={() => this.handleSwitchGameMode()}
+                                    className="material-icons start-game settings-button">api</i>)
+                                : (<i onClick={() => this.handleSwitchGameMode()}
+                                    className="material-icons start-game settings-button">pages</i>)) : ""}
                             {isHost ? (data.phase === 0
                                 ? (<i onClick={() => this.handleClickTogglePause()}
                                       className={`material-icons start-game settings-button`}>play_arrow</i>)
                                 : <i onClick={() => this.handleClickStop()}
                                      className="toggle-theme material-icons settings-button">stop</i>) : ""}
+                            {isHost && !data.timed  && data.phase !== 0
+                                ? (<i onClick={() => this.handleClickPause()}
+                                        className="material-icons start-game settings-button">
+                                        {data.paused ? "play_arrow" : "pause"}</i>): ""}
                             {!isHost || data.phase !== 0
                                 ? (<i onClick={() => this.handleClickShowCards()}
                                       className="material-icons settings-button">amp_stories</i>)

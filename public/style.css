@@ -219,6 +219,17 @@ h1, h2, h3 {
     margin-top: 1px;
 }
 
+.profile-afk:before {
+    content: '';
+    background: url('./icons/afk.svg') no-repeat;
+    background-size: contain;
+    width: 32px;
+    height: 26px;
+    display: block;
+    margin-left: 15px;
+    margin-top: 12px;
+}
+
 .districts {
     display: flex;
     flex-direction: column;
@@ -1514,4 +1525,24 @@ button.inactive {
             height: auto;
         }
     }
+}
+
+.watch {
+    width: 102px;
+    height: 135px;
+    position: absolute;
+    top: 6px;
+    right: 21px;
+    background: url(icons/watch.png);
+    background-size: contain;
+    opacity: 0.6;
+}
+
+.watch-hand {
+    width: 102px;
+    height: 101px;
+    background: url(icons/watch-hand.png) no-repeat center center;
+    position: absolute;
+    bottom: 0;
+    background-size: contain;
 }
