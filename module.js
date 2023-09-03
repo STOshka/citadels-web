@@ -74,13 +74,37 @@ function init(wsServer, path) {
                 },
                 updateState = () => [...room.onlinePlayers].forEach(sendState),
                 sendStateSlot = (slot) => sendState(room.playerSlots[slot]),
-                markAsAFK = (slot) => room.afkSlots[slot] = slot && sendStateSlot(slot) // логику добавления класса,
+                markAsAFK = (slot) => room.afkSlots[slot] = slot && sendStateSlot(slot), // логику добавления класса,
                 unMarkAsAFK = (slot) => room.afkSlots[slot] = null,
-                getRandomCharacterIdx = () => Math.floor(Math.random() * state.characterDeck.length),
-                pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](room.playerSlots[slot], getRandomCharacterIdx()),
-                endActionCharacter = (slot) => {
+                getRandomArrayIdx = (arr) => Math.floor(Math.random() * arr.length),
+                pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](room.playerSlots[slot], getRandomArrayIdx(state.characterDeck)),
+                endActionCharacters = (slot) => {
                     // если такой перс, то сделай то и return и тд по всем
-                }
+                    if (state.currentCharacter === '2_3') {
+                        this.slotEventHandlers['spy-cards-end'](slot);
+                        return;
+                    }
+                    if (state.currentCharacter === '3_2') {
+                        this.slotEventHandlers['wizard-choose-card'](slot, getRandomArrayIdx(state.players[state.wizardPlayer].hand));
+                        return;
+                    }
+                    if (state.currentCharacter === '3_3') {
+                        while(this.slotEventHandlers['seer-return'](slot, getRandomArrayIdx(state.players[state.wizardPlayer].hand))){};
+                        return;
+                    }
+                    if (state.currentCharacter === '4_2') {
+                        this.slotEventHandlers['emperor-action'](slot, getRandomPlayerSlot(), 'coins');
+                        return;
+                    }
+                    if (state.currentCharacter === '7_2') {
+                        this.slotEventHandlers['navigator-resources'](slot, 'coins');
+                        return;
+                    }
+                    if (state.currentCharacter === '7_3') {
+                        this.slotEventHandlers['scholar-response'](slot, getRandomArrayIdx(state.players[slot].choose));
+                        return;
+                    }
+                },
                 getRandomPlayer = () => {
                     const res = [];
                     room.playerSlots.forEach((user, slot) => {
@@ -88,6 +112,15 @@ function init(wsServer, path) {
                             res.push(slot);
                     });
                     return utils.shuffle(res)[0];
+                },
+                getRandomPlayerSlot = () => {
+                    const tmp = [];
+                    room.playerSlots.forEach((val, slot) => { /// может ебануть
+                        if (val) {
+                            tmp.push(slot);
+                        }
+                    });
+                    return tmp[getRandomArrayIdx(tmp)];
                 },
                 getNextPlayer = () => {
                     let slot = room.currentPlayer;
@@ -125,25 +158,27 @@ function init(wsServer, path) {
                                 time = new Date();
                                 if (room.time <= 0) {
                                     clearInterval(timerInterval);
-                                    const failed = room.currentPlayer;
-                                    if (room.phase === 1) {
-                                        pickRandomCharacter(room.currentPlayer);
-                                        markAsAFK(room.currentPlayer);
-                                    }
-                                    if (room.phase === 2 || room.phase === 1.5) {
-                                        endActionCharacter();
-                                        this.slotEventHandlers['end-turn'](room.currentPlayer);
-                                        // потестить не нужна ли "отмена действия" на кварталах
-                                        // pickRandomCharacter(room.currentPlayer);
-                                    }
-                                    if (failed != null) {
-                                        room.whiteBoard.push({
-                                            type: "timer-fail",
-                                            slotFailed: failed
-                                        });
-                                        room.partyWin = state.players[failed].role !== "c"
-                                            ? (state.players[failed].role === "l" ? "f" : "l")
-                                            : shuffleArray(["f", "l"])[0];
+                                    const failedSlot = room.currentPlayer;
+
+                                    if (failedSlot) {
+                                        if (room.phase === 1) {
+                                            pickRandomCharacter(failedSlot);
+                                            markAsAFK(failedSlot);
+                                        }
+                                        if (room.phase === 1.5) {
+                                            this.slotEventHandlers['theater-action'](failedSlot, failedSlot);
+                                            this.slotEventHandlers['end-turn'](failedSlot);
+                                        }
+                                        if (room.phase === 2) {
+                                            endActionCharacters(failedSlot);
+                                            this.slotEventHandlers['take-resources'](failedSlot, 'coins');
+                                            if (state.characterRoles['2_2']) {
+                                                this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                            }
+                                            this.slotEventHandlers['end-turn'](failedSlot);
+                                            // потестить не нужна ли "отмена действия" на кварталах
+                                            // pickRandomCharacter(failedSlot);
+                                        }
                                     }
                                     // endGame();
                                 }
@@ -332,6 +367,18 @@ function init(wsServer, path) {
                         sendStateSlot(room.currentPlayer);
                     } else startTurn();
                 },
+                doRobBlackMailedSlot = (blackmailedSlot) => {
+                    room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
+                    if (state.trueBlackmailed === room.currentCharacter) {
+                        const gold = room.playerGold[blackmailedSlot];
+                        room.playerGold[blackmailedSlot] -= gold;
+                        room.playerGold[room.currentPlayer] += gold;
+                        room.blackmailed = [];
+                        room.trueBlackmailed = state.trueBlackmailed;
+                        countPoints(blackmailedSlot);
+                        countPoints(room.currentPlayer);
+                    }
+                }, 
                 startTurn = () => {
                     if (room.robbed === room.currentCharacter) {
                         let gold = room.playerGold[room.currentPlayer];
@@ -930,12 +977,18 @@ function init(wsServer, path) {
                             countPoints(thiefSlot);
                             startTurn();
                         } else {
-                            room.targetSlot = slot;
-                            room.currentPlayer = thiefSlot;
-                            state.players[thiefSlot].action = 'blackmailed-open';
-                            sendStateSlot(slot);
-                            sendStateSlot(thiefSlot);
-                            update();
+                            if (room.afkSlots.include(slot)) {
+                                doRobBlackMailedSlot(blackmailedSlot);
+                                update(); /// понять зачем
+                                startTurn();
+                            } else {
+                                room.targetSlot = slot;
+                                room.currentPlayer = thiefSlot;
+                                state.players[thiefSlot].action = 'blackmailed-open';
+                                sendStateSlot(slot);
+                                sendStateSlot(thiefSlot);
+                                update();
+                            }
                         }
                     }
                 },
@@ -944,16 +997,7 @@ function init(wsServer, path) {
                         state.players[slot].action = null;
                         const blackmailedSlot = state.characterRoles[room.currentCharacter];
                         if (ans === 'yes') {
-                            room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
-                            if (state.trueBlackmailed === room.currentCharacter) {
-                                const gold = room.playerGold[blackmailedSlot];
-                                room.playerGold[blackmailedSlot] -= gold;
-                                room.playerGold[room.currentPlayer] += gold;
-                                room.blackmailed = [];
-                                room.trueBlackmailed = state.trueBlackmailed;
-                                countPoints(blackmailedSlot);
-                                countPoints(room.currentPlayer);
-                            }
+                            doRobBlackMailedSlot(blackmailedSlot);
                         } else {
                             room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
                         }
