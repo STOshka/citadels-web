@@ -38,13 +38,14 @@ function init(wsServer, path) {
                 playerDistricts: {},
                 playerCharacter: {},
                 playerScore: {},
+                paused: false,
                 timed: false,
                 timeChanged: false,
                 afkSlots: [],
-                pickTime: 90,
-                turnTime: 30,
-                leavedPickTime: 20,
-                leavedTurnTime: 5,
+                pickTime: 5, // 90
+                turnTime: 5, // 30
+                leavedPickTime: 2, // 20
+                leavedTurnTime: 2, // 5
             };
             if (testMode)
                 [1, 2, 3, 4].forEach((_, ind) => {
@@ -60,11 +61,12 @@ function init(wsServer, path) {
                 characterRoles: {}
             };
             this.state = state;
+            let timerInterval;
             const
                 send = (target, event, data) => userRegistry.send(target, event, data),
                 update = () => send(room.onlinePlayers, "state", room),
                 sendSlot = (slot, event, data) => {
-                    send(room.playerSlots[slot], event, data);
+                    send(room.playerSlots[slot], event, data);room.timed
                 },
                 sendState = (user) => {
                     const slot = room.playerSlots.indexOf(user);
@@ -74,10 +76,10 @@ function init(wsServer, path) {
                 },
                 updateState = () => [...room.onlinePlayers].forEach(sendState),
                 sendStateSlot = (slot) => sendState(room.playerSlots[slot]),
-                markAsAFK = (slot) => room.afkSlots[slot] = slot && sendStateSlot(slot), // логику добавления класса,
+                markAsAFK = (slot) => (room.afkSlots[slot] = slot) && sendStateSlot(slot), // логику добавления класса,
                 unMarkAsAFK = (slot) => room.afkSlots[slot] = null,
                 getRandomArrayIdx = (arr) => Math.floor(Math.random() * arr.length),
-                pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](room.playerSlots[slot], getRandomArrayIdx(state.characterDeck)),
+                pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](slot, getRandomArrayIdx(state.characterDeck)),
                 endActionCharacters = (slot) => {
                     // если такой перс, то сделай то и return и тд по всем
                     if (state.currentCharacter === '2_3') {
@@ -147,9 +149,9 @@ function init(wsServer, path) {
                 startTimer = () => {
                     if (room.timed) {
                         if (room.phase === 1)
-                            room.time = room.timeTotal = room.pickTime * 1000;
+                            room.time = room.pickTime * 1000;
                         else
-                            room.time = room.timeTotal = room.turnTime * 1000;
+                            room.time = room.turnTime * 1000;
                         let time = new Date();
                         clearInterval(timerInterval);
                         timerInterval = setInterval(() => {
@@ -158,18 +160,20 @@ function init(wsServer, path) {
                                 time = new Date();
                                 if (room.time <= 0) {
                                     clearInterval(timerInterval);
-                                    const failedSlot = room.currentPlayer;
-
-                                    if (failedSlot) {
+                                    const failedSlot = room.currentPlayer;;
+                                    console.log(room);
+                                    if (failedSlot + '') {
                                         if (room.phase === 1) {
                                             pickRandomCharacter(failedSlot);
                                             markAsAFK(failedSlot);
                                         }
                                         if (room.phase === 1.5) {
+                                            // endGame();
                                             this.slotEventHandlers['theater-action'](failedSlot, failedSlot);
                                             this.slotEventHandlers['end-turn'](failedSlot);
                                         }
                                         if (room.phase === 2) {
+                                            // endGame();
                                             endActionCharacters(failedSlot);
                                             this.slotEventHandlers['take-resources'](failedSlot, 'coins');
                                             if (state.characterRoles['2_2']) {
@@ -180,7 +184,6 @@ function init(wsServer, path) {
                                             // pickRandomCharacter(failedSlot);
                                         }
                                     }
-                                    // endGame();
                                 }
                             } else time = new Date();
                         }, 100);
@@ -224,7 +227,7 @@ function init(wsServer, path) {
                         room.winnerPlayer = null;
                         room.tax = 0;
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
-                        state.wizardPlayer = null
+                        state.wizardPlayer = null;
                         newRound();
                     }
                 },
@@ -263,6 +266,8 @@ function init(wsServer, path) {
                     room.currentPlayer = room.king;
                     state.players[room.currentPlayer].action = 'choose';
                     state.players[room.currentPlayer].choose = state.characterDeck;
+                    
+                    startTimer();
                     update();
                     updateState();
                 },
@@ -274,6 +279,7 @@ function init(wsServer, path) {
                     }
                     state.players[room.currentPlayer].action = null;
                     state.players[room.currentPlayer].choose = null;
+                    startTimer();
                     sendStateSlot(room.currentPlayer);
                     if (state.characterDeck.length > 1) {
                         room.currentPlayer = getNextPlayer();
@@ -307,6 +313,7 @@ function init(wsServer, path) {
                     }
                 },
                 nextChoose2 = () => {
+                    startTimer();
                     switch (state.characterDeck.length) {
                         case 6:
                         case 4:
@@ -380,6 +387,7 @@ function init(wsServer, path) {
                     }
                 }, 
                 startTurn = () => {
+                    startTimer();
                     if (room.robbed === room.currentCharacter) {
                         let gold = room.playerGold[room.currentPlayer];
                         room.playerGold[room.currentPlayer] = 0;
@@ -559,7 +567,7 @@ function init(wsServer, path) {
                             }
                     }
                     room.phase = 0;
-                    room.paused = true;
+                    // room.paused = true;
 
                     room.presetSelected = null;
                     update();
@@ -765,6 +773,7 @@ function init(wsServer, path) {
             this.userEvent = userEvent;
             this.slotEventHandlers = {
                 "take-character": (slot, value) => {
+                    console.log('"take-character":', slot, value);
                     if (room.phase === 1 && slot === room.currentPlayer && state.players[slot].action === 'choose' && ~state.characterDeck[value]) {
                         let role = state.characterDeck.splice(value, 1)[0];
                         state.players[slot].character.push(role);
@@ -1490,13 +1499,13 @@ function init(wsServer, path) {
                     if (user === room.hostId) {
                         room.timed = !room.timed;
                         if (!room.timed) {
-                            room.paused = true;
+                            // room.paused = true;
                             clearInterval(timerInterval);
                         } else {
                             if (room.phase !== 0) {
-                                room.paused = false;
+                                // room.paused = false;
                                 startTimer();
-                            } else room.paused = true;
+                            } // else room.paused = true;
                         }
                     }
                     update();

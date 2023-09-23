@@ -220,10 +220,10 @@ class PlayerSlot extends React.Component {
                             {data.king == slot ?
                                 <div className="profile-crown"></div>
                                 : null}
-                            <div className="profile-afk"></div>
-                            {/* {!data?.afkSlots[slot] === slot ?
+                            {/* <div className="profile-afk"></div> */}
+                            {!data?.afkSlots[slot] === slot ?
                                 <div className="profile-afk"></div>
-                                : null} */}
+                                : null}
                         </div>
                         : null}
 
@@ -1522,12 +1522,12 @@ class Game extends React.Component {
                                       className="material-icons start-game settings-button">lock_outline</i>)
                                 : (<i onClick={() => this.handleToggleTeamLockClick()}
                                       className="material-icons start-game settings-button">lock_open</i>)) : ""}
-                            {isHost ? (!data.timed
+                            {isHost ? (data.timed
                                 ? (<i onClick={() => this.handleToggleTimed()}
                                     className="material-icons start-game settings-button">alarm_off</i>)
                                 : (<i onClick={() => this.handleToggleTimed()}
                                     className="material-icons start-game settings-button">alarm</i>)) : ""}
-                            {isHost ? (!data.arcaded
+                            {isHost ? (data.arcaded
                                 ? (<i onClick={() => this.handleSwitchGameMode()}
                                     className="material-icons start-game settings-button">api</i>)
                                 : (<i onClick={() => this.handleSwitchGameMode()}
