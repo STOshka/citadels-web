@@ -66,7 +66,7 @@ function init(wsServer, path) {
                 send = (target, event, data) => userRegistry.send(target, event, data),
                 update = () => send(room.onlinePlayers, "state", room),
                 sendSlot = (slot, event, data) => {
-                    send(room.playerSlots[slot], event, data);room.timed
+                    send(room.playerSlots[slot], event, data);
                 },
                 sendState = (user) => {
                     const slot = room.playerSlots.indexOf(user);
@@ -76,36 +76,65 @@ function init(wsServer, path) {
                 },
                 updateState = () => [...room.onlinePlayers].forEach(sendState),
                 sendStateSlot = (slot) => sendState(room.playerSlots[slot]),
-                markAsAFK = (slot) => (room.afkSlots[slot] = slot) && sendStateSlot(slot), // логику добавления класса,
+                markAsAFK = (slot) => (room.afkSlots[slot] = slot),
                 unMarkAsAFK = (slot) => room.afkSlots[slot] = null,
                 getRandomArrayIdx = (arr) => Math.floor(Math.random() * arr.length),
                 pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](slot, getRandomArrayIdx(state.characterDeck)),
-                endActionCharacters = (slot) => {
+                endActionCharactersPhase2 = (slot) => {
+                    console.log('endActionCharacters', slot);
                     // если такой перс, то сделай то и return и тд по всем
-                    if (state.currentCharacter === '2_3') {
-                        this.slotEventHandlers['spy-cards-end'](slot);
-                        return;
+                    switch(room.currentCharacter) {
+                        case '1_2':
+                            console.log('WITCH', slot, room.witched, room.players);
+                            let resSlot;
+                            Object.entries(room.playerCharacter).forEach(([i, arr]) => !!arr.find(v => v === room.witched)? resSlot = i : null);
+                            this.slotEventHandlers['take-resources'](resSlot, 'coins');
+                            break; 
+                        case '2_2':
+                            console.log('BLACKMAIL', slot);
+                            if (room.blackmailed.length === 0) {
+                                return;
+                            }
+                            this.slotEventHandlers['take-resources'](state.characterRoles[room.blackmailed[0]], 'coins');
+                            this.slotEventHandlers['take-resources'](state.characterRoles[room.blackmailed[1]], 'coins');
+                            this.slotEventHandlers['blackmailed-open'](slot, 'yes');
+                            break;
+                        case '3_3':
+                            console.log('seer-return', slot, room.playerSlots.filter((v, idx) => !!v), state.players);
+                            room.playerSlots.forEach((val, idx) => val ? this.slotEventHandlers['seer-return'](slot, getRandomArrayIdx(state.players[idx].hand)): null);
+                            break; 
+                        case '4_2':
+                            let a = getRandomPlayerSlotForImperor(slot);
+                            console.log('emperor-response', slot, state.players, a);
+                            this.slotEventHandlers['emperor-crown'](slot, a, 'coin');
+                            break;
+                        case '7_2':
+                            console.log('navigator-resources');
+                            this.slotEventHandlers['navigator-resources'](slot, 'coins');
+                            break;
                     }
-                    if (state.currentCharacter === '3_2') {
-                        this.slotEventHandlers['wizard-choose-card'](slot, getRandomArrayIdx(state.players[state.wizardPlayer].hand));
-                        return;
+                    sendStateSlot(slot);
+                    update();
+                },
+                endActionCharactersPhase3 = (slot) => {
+                    console.log('endActionCharacters', slot);
+                    // если такой перс, то сделай то и return и тд по всем
+                    switch(room.currentCharacter) {
+                        case '2_3':
+                            console.log('spy-cards-end', slot);
+                            this.slotEventHandlers['spy-cards-end'](slot);
+                            break;
+                        case '3_2':
+                            console.log('wizard-choose-card', slot, state.players, getRandomArrayIdx(state.players[state.wizardPlayer].hand));
+                            this.slotEventHandlers['wizard-choose-card'](slot, getRandomArrayIdx(state.players[state.wizardPlayer].hand));
+                            break; 
+                        case '7_3':
+                            console.log('scholar-response', slot, state.players, getRandomArrayIdx(state.players[slot].choose));
+                            this.slotEventHandlers['scholar-response'](slot, getRandomArrayIdx(state.players[slot].choose));
+                            break; 
                     }
-                    if (state.currentCharacter === '3_3') {
-                        while(this.slotEventHandlers['seer-return'](slot, getRandomArrayIdx(state.players[state.wizardPlayer].hand))){};
-                        return;
-                    }
-                    if (state.currentCharacter === '4_2') {
-                        this.slotEventHandlers['emperor-action'](slot, getRandomPlayerSlot(), 'coins');
-                        return;
-                    }
-                    if (state.currentCharacter === '7_2') {
-                        this.slotEventHandlers['navigator-resources'](slot, 'coins');
-                        return;
-                    }
-                    if (state.currentCharacter === '7_3') {
-                        this.slotEventHandlers['scholar-response'](slot, getRandomArrayIdx(state.players[slot].choose));
-                        return;
-                    }
+                    sendStateSlot(slot);
+                    update();
                 },
                 getRandomPlayer = () => {
                     const res = [];
@@ -115,13 +144,12 @@ function init(wsServer, path) {
                     });
                     return utils.shuffle(res)[0];
                 },
-                getRandomPlayerSlot = () => {
+                getRandomPlayerSlotForImperor = (imperorSlot) => {
                     const tmp = [];
                     room.playerSlots.forEach((val, slot) => { /// может ебануть
-                        if (val) {
-                            tmp.push(slot);
-                        }
+                        (val && slot !== imperorSlot && slot !== room.king) ? tmp.push(slot): null;
                     });
+                    console.log(tmp);
                     return tmp[getRandomArrayIdx(tmp)];
                 },
                 getNextPlayer = () => {
@@ -160,29 +188,46 @@ function init(wsServer, path) {
                                 time = new Date();
                                 if (room.time <= 0) {
                                     clearInterval(timerInterval);
-                                    const failedSlot = room.currentPlayer;;
-                                    console.log(room);
+                                    const failedSlot = room.currentPlayer;
+                                    console.log('ROOM:', room);
                                     if (failedSlot + '') {
+                                        console.log('failedSlot', failedSlot);
                                         if (room.phase === 1) {
                                             pickRandomCharacter(failedSlot);
                                             markAsAFK(failedSlot);
+                                            update();
+                                            updateState();
+                                            return;
                                         }
                                         if (room.phase === 1.5) {
                                             // endGame();
                                             this.slotEventHandlers['theater-action'](failedSlot, failedSlot);
                                             this.slotEventHandlers['end-turn'](failedSlot);
+                                            return;
                                         }
+                                        
+                                        console.log('in PHASE:', room.phase);
+                                        this.slotEventHandlers['take-resources'](failedSlot, 'coins');
+                                        console.log('STATE:',state);
+                                        // if (room.blackmailed.length > 0 && room.blackmailed.includes(room.currentCharacter)) {
+                                        //     this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                        // }
+                                        // if (state.characterRoles['2_2']) {
+                                        //     this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                        // }
+
                                         if (room.phase === 2) {
-                                            // endGame();
-                                            endActionCharacters(failedSlot);
-                                            this.slotEventHandlers['take-resources'](failedSlot, 'coins');
-                                            if (state.characterRoles['2_2']) {
+                                            endActionCharactersPhase2(failedSlot);
+                                            if (room.blackmailed.length > 0 && room.blackmailed.includes(room.currentCharacter)) {
                                                 this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                                this.slotEventHandlers['blackmailed-open'](failedSlot, 'yes');
                                             }
-                                            this.slotEventHandlers['end-turn'](failedSlot);
-                                            // потестить не нужна ли "отмена действия" на кварталах
-                                            // pickRandomCharacter(failedSlot);
+                                        } else if (room.phase === 3) {
+                                            endActionCharactersPhase3(failedSlot);
                                         }
+
+                                        this.slotEventHandlers['take-resources'](failedSlot, 'coins');
+                                        this.slotEventHandlers['end-turn'](failedSlot);
                                     }
                                 }
                             } else time = new Date();
@@ -226,6 +271,7 @@ function init(wsServer, path) {
                         room.ender = null;
                         room.winnerPlayer = null;
                         room.tax = 0;
+                        room.afkSlots = [];
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
                         state.wizardPlayer = null;
                         newRound();
@@ -358,6 +404,7 @@ function init(wsServer, path) {
                     state.firstBuilding = false;
                     if (["4_1", "4_3"].includes(room.currentCharacter)) room.king = room.currentPlayer;
                     if (waitToResponse()) {
+                        startTimer();
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else startTurn();
@@ -567,6 +614,7 @@ function init(wsServer, path) {
                             }
                     }
                     room.phase = 0;
+                    room.afkSlots = [];
                     // room.paused = true;
 
                     room.presetSelected = null;
@@ -972,6 +1020,7 @@ function init(wsServer, path) {
                     }
                 },
                 "blackmailed-response": (slot, ans) => {
+                    console.log('blackmailed-response', state.players[slot].action === 'blackmailed-response')
                     if (room.phase === 2 && state.players[slot].action === 'blackmailed-response' && ~['yes', 'no'].indexOf(ans)) {
                         state.players[slot].action = null;
                         const thief = room.witched === "2_2" ? "1_2" : "2_2";
@@ -986,7 +1035,7 @@ function init(wsServer, path) {
                             countPoints(thiefSlot);
                             startTurn();
                         } else {
-                            if (room.afkSlots.include(slot)) {
+                            if (room.afkSlots.includes(slot)) {
                                 doRobBlackMailedSlot(blackmailedSlot);
                                 update(); /// понять зачем
                                 startTurn();
@@ -1152,6 +1201,8 @@ function init(wsServer, path) {
                     }
                 },
                 "emperor-crown": (slot, slot_d, res) => {
+                    console.log('emperor-crown',state.players[slot_d], room.phase === 2, ['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action), state.players[slot_d]
+                   , slot !== slot_d, room.king !== slot_d, ~['coin', 'card'].indexOf(res), slot, slot_d, res, room.king, state.players[slot].action, );
                     if (room.phase === 2 && ['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action) && state.players[slot_d]
                         && slot !== slot_d && room.king !== slot_d && ~['coin', 'card'].indexOf(res)) {
                         let action = state.players[slot].action;

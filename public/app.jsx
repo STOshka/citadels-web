@@ -168,7 +168,7 @@ class PlayerSlot extends React.Component {
                 "winner": isWinner,
                 "player-chosen": playerChosen,
                 "hasCrown": data.king === slot,
-                // "isAFK": data?.afkSlots[slot],
+                // "profile-afk": Boolean(data.afkSlots[slot]),
                 "seer-return": slot === data.seerReturnSlot,
                 "target": slot === data.targetSlot
             })}>
@@ -221,7 +221,7 @@ class PlayerSlot extends React.Component {
                                 <div className="profile-crown"></div>
                                 : null}
                             {/* <div className="profile-afk"></div> */}
-                            {!data?.afkSlots[slot] === slot ?
+                            {data.afkSlots[slot] === slot ?
                                 <div className="profile-afk"></div>
                                 : null}
                         </div>
@@ -756,7 +756,8 @@ class Game extends React.Component {
     }
 
     handleTakeResource(res) {
-        this.socket.emit('take-resources', res)
+        console.log('this.socket.emit(take-resources', res);
+        this.socket.emit('take-resources', res);
     }
 
     handleTakeCard(card) {
