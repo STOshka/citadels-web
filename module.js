@@ -27,6 +27,7 @@ function init(wsServer, path) {
                 onlinePlayers: new JSONSet(),
                 spectators: new JSONSet(),
                 teamsLocked: false,
+                arcaded: false,
                 phase: 0,
                 currentPlayer: null,
                 targetSlot: null,
@@ -36,7 +37,15 @@ function init(wsServer, path) {
                 playerHand: {},
                 playerDistricts: {},
                 playerCharacter: {},
-                playerScore: {}
+                playerScore: {},
+                paused: false,
+                timed: false,
+                timeChanged: false,
+                afkSlots: [],
+                pickTime: 5, // 90
+                turnTime: 5, // 30
+                leavedPickTime: 2, // 20
+                leavedTurnTime: 2, // 5
             };
             if (testMode)
                 [1, 2, 3, 4].forEach((_, ind) => {
@@ -52,6 +61,7 @@ function init(wsServer, path) {
                 characterRoles: {}
             };
             this.state = state;
+            let timerInterval;
             const
                 send = (target, event, data) => userRegistry.send(target, event, data),
                 update = () => send(room.onlinePlayers, "state", room),
@@ -66,6 +76,66 @@ function init(wsServer, path) {
                 },
                 updateState = () => [...room.onlinePlayers].forEach(sendState),
                 sendStateSlot = (slot) => sendState(room.playerSlots[slot]),
+                markAsAFK = (slot) => (room.afkSlots[slot] = slot),
+                unMarkAsAFK = (slot) => room.afkSlots[slot] = null,
+                getRandomArrayIdx = (arr) => Math.floor(Math.random() * arr.length),
+                pickRandomCharacter = (slot) => this.slotEventHandlers['take-character'](slot, getRandomArrayIdx(state.characterDeck)),
+                endActionCharactersPhase2 = (slot) => {
+                    console.log('endActionCharacters', slot);
+                    // если такой перс, то сделай то и return и тд по всем
+                    switch(room.currentCharacter) {
+                        case '1_2':
+                            console.log('WITCH', slot, room.witched, room.players);
+                            let resSlot;
+                            Object.entries(room.playerCharacter).forEach(([i, arr]) => !!arr.find(v => v === room.witched)? resSlot = i : null);
+                            this.slotEventHandlers['take-resources'](resSlot, 'coins');
+                            break; 
+                        case '2_2':
+                            console.log('BLACKMAIL', slot);
+                            if (room.blackmailed.length === 0) {
+                                return;
+                            }
+                            this.slotEventHandlers['take-resources'](state.characterRoles[room.blackmailed[0]], 'coins');
+                            this.slotEventHandlers['take-resources'](state.characterRoles[room.blackmailed[1]], 'coins');
+                            this.slotEventHandlers['blackmailed-open'](slot, 'yes');
+                            break;
+                        case '3_3':
+                            console.log('seer-return', slot, room.playerSlots.filter((v, idx) => !!v), state.players);
+                            room.playerSlots.forEach((val, idx) => val ? this.slotEventHandlers['seer-return'](slot, getRandomArrayIdx(state.players[idx].hand)): null);
+                            break; 
+                        case '4_2':
+                            let a = getRandomPlayerSlotForImperor(slot);
+                            console.log('emperor-response', slot, state.players, a);
+                            this.slotEventHandlers['emperor-crown'](slot, a, 'coin');
+                            break;
+                        case '7_2':
+                            console.log('navigator-resources');
+                            this.slotEventHandlers['navigator-resources'](slot, 'coins');
+                            break;
+                    }
+                    sendStateSlot(slot);
+                    update();
+                },
+                endActionCharactersPhase3 = (slot) => {
+                    console.log('endActionCharacters', slot);
+                    // если такой перс, то сделай то и return и тд по всем
+                    switch(room.currentCharacter) {
+                        case '2_3':
+                            console.log('spy-cards-end', slot);
+                            this.slotEventHandlers['spy-cards-end'](slot);
+                            break;
+                        case '3_2':
+                            console.log('wizard-choose-card', slot, state.players, getRandomArrayIdx(state.players[state.wizardPlayer].hand));
+                            this.slotEventHandlers['wizard-choose-card'](slot, getRandomArrayIdx(state.players[state.wizardPlayer].hand));
+                            break; 
+                        case '7_3':
+                            console.log('scholar-response', slot, state.players, getRandomArrayIdx(state.players[slot].choose));
+                            this.slotEventHandlers['scholar-response'](slot, getRandomArrayIdx(state.players[slot].choose));
+                            break; 
+                    }
+                    sendStateSlot(slot);
+                    update();
+                },
                 getRandomPlayer = () => {
                     const res = [];
                     room.playerSlots.forEach((user, slot) => {
@@ -73,6 +143,14 @@ function init(wsServer, path) {
                             res.push(slot);
                     });
                     return utils.shuffle(res)[0];
+                },
+                getRandomPlayerSlotForImperor = (imperorSlot) => {
+                    const tmp = [];
+                    room.playerSlots.forEach((val, slot) => { /// может ебануть
+                        (val && slot !== imperorSlot && slot !== room.king) ? tmp.push(slot): null;
+                    });
+                    console.log(tmp);
+                    return tmp[getRandomArrayIdx(tmp)];
                 },
                 getNextPlayer = () => {
                     let slot = room.currentPlayer;
@@ -95,6 +173,66 @@ function init(wsServer, path) {
                             slot--;
                     }
                     return slot;
+                },
+                startTimer = () => {
+                    if (room.timed) {
+                        if (room.phase === 1)
+                            room.time = room.pickTime * 1000;
+                        else
+                            room.time = room.turnTime * 1000;
+                        let time = new Date();
+                        clearInterval(timerInterval);
+                        timerInterval = setInterval(() => {
+                            if (!room.paused) {
+                                room.time -= new Date() - time;
+                                time = new Date();
+                                if (room.time <= 0) {
+                                    clearInterval(timerInterval);
+                                    const failedSlot = room.currentPlayer;
+                                    console.log('ROOM:', room);
+                                    if (failedSlot + '') {
+                                        console.log('failedSlot', failedSlot);
+                                        if (room.phase === 1) {
+                                            pickRandomCharacter(failedSlot);
+                                            markAsAFK(failedSlot);
+                                            update();
+                                            updateState();
+                                            return;
+                                        }
+                                        if (room.phase === 1.5) {
+                                            // endGame();
+                                            this.slotEventHandlers['theater-action'](failedSlot, failedSlot);
+                                            this.slotEventHandlers['end-turn'](failedSlot);
+                                            return;
+                                        }
+                                        
+                                        console.log('in PHASE:', room.phase);
+                                        this.slotEventHandlers['take-resources'](failedSlot, 'coins');
+                                        console.log('STATE:',state);
+                                        // if (room.blackmailed.length > 0 && room.blackmailed.includes(room.currentCharacter)) {
+                                        //     this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                        // }
+                                        // if (state.characterRoles['2_2']) {
+                                        //     this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                        // }
+
+                                        if (room.phase === 2) {
+                                            endActionCharactersPhase2(failedSlot);
+                                            if (room.blackmailed.length > 0 && room.blackmailed.includes(room.currentCharacter)) {
+                                                this.slotEventHandlers['blackmailed-response'](failedSlot, 'yes');
+                                                this.slotEventHandlers['blackmailed-open'](failedSlot, 'yes');
+                                            }
+                                        } else if (room.phase === 3) {
+                                            endActionCharactersPhase3(failedSlot);
+                                        }
+
+                                        this.slotEventHandlers['take-resources'](failedSlot, 'coins');
+                                        this.slotEventHandlers['end-turn'](failedSlot);
+                                    }
+                                }
+                            } else time = new Date();
+                        }, 100);
+                    }
                 },
                 startGame = (districts) => {
                     state.playersCount = room.playerSlots.filter((user) => user !== null).length;
@@ -133,8 +271,9 @@ function init(wsServer, path) {
                         room.ender = null;
                         room.winnerPlayer = null;
                         room.tax = 0;
+                        room.afkSlots = [];
                         state.maxDistricts = state.playersCount < 4 ? 8 : 7;
-                        state.wizardPlayer = null
+                        state.wizardPlayer = null;
                         newRound();
                     }
                 },
@@ -173,6 +312,8 @@ function init(wsServer, path) {
                     room.currentPlayer = room.king;
                     state.players[room.currentPlayer].action = 'choose';
                     state.players[room.currentPlayer].choose = state.characterDeck;
+                    
+                    startTimer();
                     update();
                     updateState();
                 },
@@ -184,6 +325,7 @@ function init(wsServer, path) {
                     }
                     state.players[room.currentPlayer].action = null;
                     state.players[room.currentPlayer].choose = null;
+                    startTimer();
                     sendStateSlot(room.currentPlayer);
                     if (state.characterDeck.length > 1) {
                         room.currentPlayer = getNextPlayer();
@@ -217,6 +359,7 @@ function init(wsServer, path) {
                     }
                 },
                 nextChoose2 = () => {
+                    startTimer();
                     switch (state.characterDeck.length) {
                         case 6:
                         case 4:
@@ -261,6 +404,7 @@ function init(wsServer, path) {
                     state.firstBuilding = false;
                     if (["4_1", "4_3"].includes(room.currentCharacter)) room.king = room.currentPlayer;
                     if (waitToResponse()) {
+                        startTimer();
                         update();
                         sendStateSlot(room.currentPlayer);
                     } else startTurn();
@@ -277,7 +421,20 @@ function init(wsServer, path) {
                         sendStateSlot(room.currentPlayer);
                     } else startTurn();
                 },
+                doRobBlackMailedSlot = (blackmailedSlot) => {
+                    room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
+                    if (state.trueBlackmailed === room.currentCharacter) {
+                        const gold = room.playerGold[blackmailedSlot];
+                        room.playerGold[blackmailedSlot] -= gold;
+                        room.playerGold[room.currentPlayer] += gold;
+                        room.blackmailed = [];
+                        room.trueBlackmailed = state.trueBlackmailed;
+                        countPoints(blackmailedSlot);
+                        countPoints(room.currentPlayer);
+                    }
+                }, 
                 startTurn = () => {
+                    startTimer();
                     if (room.robbed === room.currentCharacter) {
                         let gold = room.playerGold[room.currentPlayer];
                         room.playerGold[room.currentPlayer] = 0;
@@ -457,6 +614,8 @@ function init(wsServer, path) {
                             }
                     }
                     room.phase = 0;
+                    room.afkSlots = [];
+                    // room.paused = true;
 
                     room.presetSelected = null;
                     update();
@@ -662,6 +821,7 @@ function init(wsServer, path) {
             this.userEvent = userEvent;
             this.slotEventHandlers = {
                 "take-character": (slot, value) => {
+                    console.log('"take-character":', slot, value);
                     if (room.phase === 1 && slot === room.currentPlayer && state.players[slot].action === 'choose' && ~state.characterDeck[value]) {
                         let role = state.characterDeck.splice(value, 1)[0];
                         state.players[slot].character.push(role);
@@ -860,6 +1020,7 @@ function init(wsServer, path) {
                     }
                 },
                 "blackmailed-response": (slot, ans) => {
+                    console.log('blackmailed-response', state.players[slot].action === 'blackmailed-response')
                     if (room.phase === 2 && state.players[slot].action === 'blackmailed-response' && ~['yes', 'no'].indexOf(ans)) {
                         state.players[slot].action = null;
                         const thief = room.witched === "2_2" ? "1_2" : "2_2";
@@ -874,12 +1035,18 @@ function init(wsServer, path) {
                             countPoints(thiefSlot);
                             startTurn();
                         } else {
-                            room.targetSlot = slot;
-                            room.currentPlayer = thiefSlot;
-                            state.players[thiefSlot].action = 'blackmailed-open';
-                            sendStateSlot(slot);
-                            sendStateSlot(thiefSlot);
-                            update();
+                            if (room.afkSlots.includes(slot)) {
+                                doRobBlackMailedSlot(blackmailedSlot);
+                                update(); /// понять зачем
+                                startTurn();
+                            } else {
+                                room.targetSlot = slot;
+                                room.currentPlayer = thiefSlot;
+                                state.players[thiefSlot].action = 'blackmailed-open';
+                                sendStateSlot(slot);
+                                sendStateSlot(thiefSlot);
+                                update();
+                            }
                         }
                     }
                 },
@@ -888,16 +1055,7 @@ function init(wsServer, path) {
                         state.players[slot].action = null;
                         const blackmailedSlot = state.characterRoles[room.currentCharacter];
                         if (ans === 'yes') {
-                            room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
-                            if (state.trueBlackmailed === room.currentCharacter) {
-                                const gold = room.playerGold[blackmailedSlot];
-                                room.playerGold[blackmailedSlot] -= gold;
-                                room.playerGold[room.currentPlayer] += gold;
-                                room.blackmailed = [];
-                                room.trueBlackmailed = state.trueBlackmailed;
-                                countPoints(blackmailedSlot);
-                                countPoints(room.currentPlayer);
-                            }
+                            doRobBlackMailedSlot(blackmailedSlot);
                         } else {
                             room.blackmailed.splice(room.blackmailed.indexOf(room.currentCharacter), 1);
                         }
@@ -1043,6 +1201,8 @@ function init(wsServer, path) {
                     }
                 },
                 "emperor-crown": (slot, slot_d, res) => {
+                    console.log('emperor-crown',state.players[slot_d], room.phase === 2, ['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action), state.players[slot_d]
+                   , slot !== slot_d, room.king !== slot_d, ~['coin', 'card'].indexOf(res), slot, slot_d, res, room.king, state.players[slot].action, );
                     if (room.phase === 2 && ['emperor-action', 'emperor-nores-action'].includes(state.players[slot].action) && state.players[slot_d]
                         && slot !== slot_d && room.king !== slot_d && ~['coin', 'card'].indexOf(res)) {
                         let action = state.players[slot].action;
@@ -1342,8 +1502,7 @@ function init(wsServer, path) {
                 },
                 "end-turn": (slot) => {
                     if (room.phase === 2 && slot === room.currentPlayer && room.tookResource) {
-                        if (['witch-action',
-                            'magistrate-open',
+                        if (['magistrate-open',
                             'blackmailed-response',
                             'blackmailed-open',
                             'emperor-action',
@@ -1385,6 +1544,31 @@ function init(wsServer, path) {
                 "toggle-lock": (user) => {
                     if (user === room.hostId)
                         room.teamsLocked = !room.teamsLocked;
+                    update();
+                },
+                "toggle-timed": (user) => {
+                    if (user === room.hostId) {
+                        room.timed = !room.timed;
+                        if (!room.timed) {
+                            // room.paused = true;
+                            clearInterval(timerInterval);
+                        } else {
+                            if (room.phase !== 0) {
+                                // room.paused = false;
+                                startTimer();
+                            } // else room.paused = true;
+                        }
+                    }
+                    update();
+                },
+                "toggle-paused": (user) => {
+                    if (user === room.hostId) {
+                        room.paused = !room.paused;
+                        if (!room.paused && room.timeChanged) {
+                            room.timeChanged = false;
+                            startTimer();
+                        }
+                    }
                     update();
                 },
                 "players-join": (user, slot) => {
