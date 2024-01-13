@@ -13,10 +13,7 @@ function makeId() {
 
 class Player extends React.Component {
     render() {
-        const
-            data = this.props.data,
-            game = this.props.game,
-            id = this.props.id,
+        const { data, game, id } = this.props,
             isHost = data.userId === data.hostId,
             hasPlayer = id !== null;
         return (
@@ -62,9 +59,7 @@ class Player extends React.Component {
 class Spectators extends React.Component {
     render() {
         const
-            data = this.props.data,
-            game = this.props.game,
-            handleSpectatorsClick = this.props.handleSpectatorsClick;
+            { data, game, handleSpectatorsClick } = this.props;
         return (
             <div
                 onClick={handleSpectatorsClick}
@@ -81,14 +76,10 @@ class Spectators extends React.Component {
 
 class Card extends React.Component {
     render() {
-        const
-            game = this.props.game,
-            type = this.props.type,
+        const { game, type, isToken, isGallery } = this.props, 
             isCharacter = type === "character",
-            data = this.props.game.state,
+            data = game.state,
             originalCard = this.props.card,
-            isToken = this.props.isToken,
-            isGallery = this.props.isGallery,
             card = (originalCard === "1_2" && data.witchedstate === 1 && !isToken && !isGallery) ? data.witched : originalCard,
             cardType = card.type,
             getBackgroundImage = (isToken, useOriginalCard) => `url(/citadels/${isToken ? "character-tokens" : (isCharacter ? "characters" : "cards")}/${
@@ -143,9 +134,7 @@ class Card extends React.Component {
 class PlayerSlot extends React.Component {
     render() {
         const
-            data = this.props.data,
-            slot = this.props.slot,
-            game = this.props.game,
+            { data, slot, game } = this.props,
             player = data.playerSlots[slot],
             districts = data.playerDistricts[slot],
             character = player === data.userId && data.player ? data.player.character : data.playerCharacter[slot],
@@ -1288,8 +1277,8 @@ class Game extends React.Component {
                                     </div>
                                     : null}
                                 {data.phase == 2 && ['thief-action', 'blackmailer-action'].includes(data.player.action) && !data.userAction ?
-                                    <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Выберите персонажа
+                                    <div className="status-text choose-character">
+                                        <p className="status-text">Выберите персонажа
                                             для {data.player.action === "thief-action" ? "воровства" :
                                                 data.cardChosen.length == 0 ? "шантажа" : "блефа"}</p>
                                         <div className="cards-list">
@@ -1302,8 +1291,8 @@ class Game extends React.Component {
                                     </div>
                                     : null}
                                 {data.phase == 2 && data.player.action === "seer-return" ?
-                                    <div className="status-text" className="choose-character">
-                                        <p className="status-text" className="status-text">Выберите карту, чтобы отдать
+                                    <div className="status-text choose-character">
+                                        <p className="status-text">Выберите карту, чтобы отдать
                                             её {window.commonRoom.getPlayerName(data.playerSlots[data.seerReturnSlot])}</p>
                                     </div>
                                     : null}
@@ -1320,49 +1309,41 @@ class Game extends React.Component {
                                 {data.phase == 2 && !data.userAction ?
                                     <div className="action-button">
                                         {canTakeResource ?
-                                            <button onClick={() => this.handleTakeResource('coins')}>Получить 2
-                                                монеты</button> : null}
-                                        {canTakeResource ?
+                                            <><button onClick={() => this.handleTakeResource('coins')}>Получить 2
+                                                монеты</button>
                                             <span className="button-or">
                                                 или
-                                            </span> : null}
-                                        {canTakeResource ?
+                                            </span>
                                             <button onClick={() => this.handleTakeResource('card')}>Взять
-                                                карту</button> : null}
+                                                карту</button></> : null}
                                         {magicianAction ?
                                             <button onClick={() => this.setUserAction("magician")}>Сбросить
                                                 карты</button> : null}
                                         {blackmailedResponseAction ?
-                                            <button onClick={() => this.handleBlackmailedResponse('yes')}>Откупиться от
-                                                шантажа</button> : null}
-                                        {blackmailedResponseAction ?
+                                            <><button onClick={() => this.handleBlackmailedResponse('yes')}>Откупиться от
+                                                шантажа</button>
                                             <span className="button-or">
                                                 или
-                                            </span> : null}
-                                        {blackmailedResponseAction ?
+                                            </span>
                                             <button onClick={() => this.handleBlackmailedResponse('no')}>Отказаться от
-                                                откупа</button> : null}
+                                                откупа</button></> : null}
                                         {blackmailedOpenAction || magistrateOpenAction ?
-                                            <button onClick={() => this.handleTokenOpen('yes')}>Раскрыть
-                                                свой {blackmailedOpenAction ? "шантаж" : "орден"}</button> : null}
-                                        {blackmailedOpenAction || magistrateOpenAction ?
+                                            <><button onClick={() => this.handleTokenOpen('yes')}>Раскрыть
+                                                свой {blackmailedOpenAction ? "шантаж" : "орден"}</button>
                                             <span className="button-or">
                                                 или
-                                            </span> : null}
-                                        {blackmailedOpenAction || magistrateOpenAction ?
+                                            </span>
                                             <button onClick={() => this.handleTokenOpen('no')}>Оставить
                                                 свой {blackmailedOpenAction ? "шантаж" : "орден"} в
-                                                тайне</button> : null}
+                                                тайне</button></> : null}
                                         {navigatorAction ?
-                                            <button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
-                                                монеты</button> : null}
-                                        {navigatorAction ?
+                                            <><button onClick={() => this.handleNavigatorResource('coins')}>Получить 4
+                                                монеты</button>
                                             <span className="button-or">
                                                 или
-                                            </span> : null}
-                                        {navigatorAction ?
+                                            </span>
                                             <button onClick={() => this.handleNavigatorResource('card')}>Получить
-                                                4 карты</button> : null}
+                                                4 карты</button></> : null}
                                         {seerAction ?
                                             <button onClick={() => this.handleSeerAction()}>Действие провидицы
                                             </button> : null}
@@ -1432,35 +1413,28 @@ class Game extends React.Component {
                                                     onClick={() => this.handleClickBuildForGold()}>
                                                     Построить за золото
                                                 </button> : null}
-                                            {(emperorAction) ?
+                                            {emperorAction ?
+                                                <>
                                                 <button onClick={() => this.handleEmperor(null, 'coin')}>Получить
-                                                    монету</button> : null}
-                                            {(emperorAction) ?
+                                                    монету</button>
                                                 <span className="button-or">
                                                     или
-                                                </span> : null}
-                                            {(emperorAction) ?
+                                                </span>
                                                 <button onClick={() => this.handleEmperor(null, 'card')}>Получить
-                                                    карту</button> : null}
+                                                    карту</button>
+                                                    </> : null}
                                             {(abbatIncome && incomeValue) ?
                                                 ([...Array(incomeValue + 1).keys()].map((i) => (
                                                     <button
                                                         onClick={() => this.handleAbbatIncome(i)}>{i} к.</button>))) : null}
                                             {spyUserAction ?
-                                                <button onClick={() => this.handleSpyChooseDistrict(4)}>Дворянский
-                                                </button> : null}
-                                            {spyUserAction ?
-                                                <button onClick={() => this.handleSpyChooseDistrict(5)}>Церковный
-                                                </button> : null}
-                                            {spyUserAction ?
-                                                <button onClick={() => this.handleSpyChooseDistrict(6)}>Торговый
-                                                </button> : null}
-                                            {spyUserAction ?
-                                                <button onClick={() => this.handleSpyChooseDistrict(8)}>Воинский
-                                                </button> : null}
-                                            {spyUserAction ?
-                                                <button onClick={() => this.handleSpyChooseDistrict(9)}>Особый
-                                                </button> : null}
+                                                <>
+                                                    <button onClick={() => this.handleSpyChooseDistrict(4)}>Дворянский</button>
+                                                    <button onClick={() => this.handleSpyChooseDistrict(5)}>Церковный</button>
+                                                    <button onClick={() => this.handleSpyChooseDistrict(6)}>Торговый</button>
+                                                    <button onClick={() => this.handleSpyChooseDistrict(8)}>Воинский</button>
+                                                    <button onClick={() => this.handleSpyChooseDistrict(9)}>Особый</button>
+                                                </> : null}
                                             {cardinalActionCards ?
                                                 <button onClick={() => this.handleCardinalActionCards()}>Применить
                                                 </button> : null}
